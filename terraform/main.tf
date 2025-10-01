@@ -37,15 +37,14 @@ resource "google_sql_database_instance" "postgres_instance" {
     ip_configuration {
         ipv4_enabled = true # public IP
         ssl_mode = "ENCRYPTED_ONLY"
-        # dynamic "authorized_networks" {
-        #     for_each = local.onprem
-        #     iterator = onprem
-
-        #     content {
-        #       name  = "onprem-${onprem.key}"
-        #       value = onprem.value
-        #     }
-        # }
+        dynamic "authorized_networks" {
+            for_each = var.authorized_networks
+            iterator = authorized_networks
+            content {
+              name  = authorized_networks.value.name
+              value = authorized_networks.value.value
+            }
+        }
     }
   }
   deletion_protection = false

@@ -1,81 +1,63 @@
-name: dbt Cloud CI
+name: CI_pipeline
 on:
   pull_request:
     branches:
       - main
-      - staging
 jobs:
-  run_snowflake:
-    name: dbt Cloud PR CI Snowflake
-    runs-on: macos-latest
-
+  CI_jobs:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
     env:
-      DBT_ACCOUNT_ID: 188483
-      DBT_PROJECT_ID: 283328
-      DBT_PR_JOB_ID: 552843
-      DBT_API_KEY: ${{ secrets.DBT_CLOUD_API_KEY }}
-      DBT_JOB_CAUSE: "GitHub Actions Request"
-      DBT_JOB_BRANCH: ${{ github.head_ref }}
-      DBT_JOB_SCHEMA_OVERRIDE: dbt_jsdx__pr_${{ github.head_ref}}
-
+      PG_USERNAME: ${{ secrets.PG_USERNAME }}
+      PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
+      PG_DB_NAME: ${{ secrets.PG_DB_NAME }}
+      GITHUB_PR_SCHEMA: "ci_pr_${{github.event.pull_request.number}}"
+      PG_PUBLIC_IP: ${{secrets.PG_PUBLIC_IP}}
     steps:
-      - uses: "actions/checkout@v4"
-      - uses: "actions/setup-python@v5"
-        with:
-          python-version: "3.12"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Changed Files
+        id: file_changes
+        uses: tj-actions/changed-files@v46.0.3
+
+      # - name: Check env var GITHUB_CONTEXT
+      #   run: echo '${{ toJson(github) }}'
+
+      - name: Print info
+        run: |
+          echo PR number: "$GITHUB_PR_SCHEMA"
+          echo Changed files: '${{ steps.file_changes.outputs.all_changed_files}}'
+
       - name: Install uv
-        run: python3 -m pip install uv
-      - name: Install deps
-        run: uv pip install -r requirements.txt --system
-      - name: Run dbt Cloud job
-        run: python3 .github/workflows/scripts/dbt_cloud_run_job.py
+        uses: astral-sh/setup-uv@v5
 
-  run_bigquery:
-    name: dbt Cloud PR CI BigQuery
-    runs-on: macos-latest
+      - name: Install python
+        run: uv python install
 
-    env:
-      DBT_ACCOUNT_ID: 188483
-      DBT_PROJECT_ID: 275557
-      DBT_PR_JOB_ID: 561096
-      DBT_API_KEY: ${{ secrets.DBT_CLOUD_API_KEY }}
-      DBT_JOB_CAUSE: "GitHub Actions Request"
-      DBT_JOB_BRANCH: ${{ github.head_ref }}
-      DBT_JOB_SCHEMA_OVERRIDE: dbt_jsdx__pr_${{ github.head_ref}}
+      - name: Install project dependencies
+        run: uv sync
 
-    steps:
-      - uses: "actions/checkout@v4"
-      - uses: "actions/setup-python@v5"
+      - name: Run pre-commit on changed files
+        if: steps.file_changes.outputs.any_changed == 'true'
+        uses: pre-commit/action@v3.0.1
         with:
-          python-version: "3.12"
-      - name: Install uv
-        run: python3 -m pip install uv
-      - name: Install deps
-        run: uv pip install -r requirements.txt --system
-      - name: Run dbt Cloud job
-        run: python3 .github/workflows/scripts/dbt_cloud_run_job.py
+          extra_args: --files ${{ steps.file_changes.outputs.all_changed_files }}
 
-  run_postgres:
-    name: dbt Cloud PR CI Postgres
-    runs-on: macos-latest
+      # dbt STUFF
+      - name: dbt Install dependencies
+        run: |
+          uv run dbt deps
 
-    env:
-      DBT_ACCOUNT_ID: 188483
-      DBT_PROJECT_ID: 288405
-      DBT_PR_JOB_ID: 577887
-      DBT_API_KEY: ${{ secrets.DBT_CLOUD_API_KEY }}
-      DBT_JOB_CAUSE: "GitHub Actions Request"
-      DBT_JOB_BRANCH: ${{ github.head_ref }}
-      DBT_JOB_SCHEMA_OVERRIDE: dbt_jsdx__pr_${{ github.head_ref}}
+      - name: dbt Test connection
+        run: |
+          uv run dbt debug --target cicd
 
-    steps:
-      - uses: "actions/checkout@v4"
-      - uses: "actions/setup-python@v5"
-        with:
-          python-version: "3.12"
-      - name: Install uv
-        run: python3 -m pip install uv
-      - name: Install deps
-        run: uv pip install -r requirements.txt --system
-      - name: Run dbt Cloud job
-        run: python3 .github/workflows/scripts/dbt_cloud_run_job.py
+      - name: dbt Build in cicd
+        run: |
+          uv run dbt build --target cicd
+
+      - name: dbt Generate documentation
+        run: |
+          uv run dbt docs generate --target cicd
