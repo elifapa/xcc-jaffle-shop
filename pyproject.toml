@@ -1,0 +1,10 @@
+[project]
+name = "xcc-jaffle-shop"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dbt-bigquery>=1.10.2",
+    "pre-commit>=4.3.0",
+]
