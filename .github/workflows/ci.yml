@@ -39,9 +39,6 @@ jobs:
       - name: Install project dependencies
         run: uv sync
 
-      - name: Install CI group dependencies
-        run: uv sync --group ci
-
       - name: Run pre-commit on changed files
         if: steps.file_changes.outputs.any_changed == 'true'
         uses: pre-commit/action@v3.0.1
