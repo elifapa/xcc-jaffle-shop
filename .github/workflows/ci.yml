@@ -29,15 +29,19 @@ jobs:
         id: all_file_changes
         uses: tj-actions/changed-files@v46.0.3
 
-      - name: Changed Files in dbt and tf
-        id: file_changes_yaml
+      - name: Changed Files in Terraform
+        id: file_changes_tf
         uses: tj-actions/changed-files@v46.0.3
         with:
-          files_yaml: |
-            dbt:
-              - dbt/**
-            terraform:
-              - terraform/**
+          files: |
+            terraform/**
+
+      - name: Changed Files in dbt
+        id: file_changes_dbt
+        uses: tj-actions/changed-files@v46.0.3
+        with:
+          files: |
+            dbt/**
 
       # - name: Check env var GITHUB_CONTEXT
       #   run: echo '${{ toJson(github) }}'
@@ -46,7 +50,8 @@ jobs:
         run: |
           echo PR number: "$GITHUB_PR_SCHEMA"
           echo Changed files: '${{ steps.all_file_changes.outputs.all_changed_files}}'
-          echo Terraform changed files: '${{steps.file_changes_yaml.outputs.terraform_changed_files}}'
+          echo Terraform changed files: '${{steps.file_changes_tf.outputs.all_changed_files}}'
+          echo dbt changed files: '${{steps.file_changes_dbt.outputs.all_changed_files}}'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -80,7 +85,7 @@ jobs:
       # Build and push only if dbt files changed
       # - name: Build and push
       #   uses: docker/build-push-action@v6
-      #   if: steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+      #   if: steps.file_changes_dbt.outputs.any_changed == 'true'
       #   with:
       #     context: .
       #     push: true
@@ -89,12 +94,12 @@ jobs:
 
       - name: Setup Terraform
         id: setup_terraform
-        if: steps.file_changes_yaml.outputs.terraform_any_changed == 'true' || steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+        if: steps.file_changes_dbt.outputs.any_changed == 'true' || steps.file_changes_tf.outputs.any_changed  == 'true'
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
         working-directory: ./terraform
-        if: steps.file_changes_yaml.outputs.terraform_any_changed == 'true' || steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+        if: steps.file_changes_dbt.outputs.any_changed == 'true' || steps.file_changes_tf.outputs.any_changed  == 'true'
         env:
           TF_STATE_BUCKET: "xcc-jaffle-shop-tfstate"
           TF_STATE_BUCKET_PREFIX: "env/${{env.environment}}/terraform/state"
@@ -105,7 +110,7 @@ jobs:
             -backend-config="prefix=${{ env.TF_STATE_BUCKET_PREFIX }}"
 
       - name: Terraform Plan
-        if: steps.file_changes_yaml.outputs.terraform_any_changed == 'true' || steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+        if: steps.file_changes_dbt.outputs.any_changed == 'true' || steps.file_changes_tf.outputs.any_changed  == 'true'
         working-directory: ./terraform
         env:
           TF_VAR_github_pr_schema: ${{env.GITHUB_PR_SCHEMA}}
@@ -124,7 +129,7 @@ jobs:
           terraform plan -no-color -input=false
 
       - name: Terraform Apply
-        if: steps.file_changes_yaml.outputs.terraform_any_changed == 'true' || steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+        if: steps.file_changes_dbt.outputs.any_changed == 'true' || steps.file_changes_tf.outputs.any_changed  == 'true'
         working-directory: ./terraform
         env:
           TF_VAR_github_pr_schema: ${{env.GITHUB_PR_SCHEMA}}
