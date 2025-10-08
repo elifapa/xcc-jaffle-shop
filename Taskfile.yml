@@ -2,39 +2,106 @@ version: "3"
 
 silent: true
 
+dotenv: ['.env']
+
 vars:
-  YEARS: 6
-  DB: bigquery
+  ENVIRONMENT: prod
+  LOCATION: europe-west4
+  PROJECT_ID: ae-dbt-ci-2025
+  REPOSITORY: ae-dbt-ci-images
+  TARGET_IMAGE: dbt-ci
+  TAG: latest
+  PROXY_PORT: 8000
+  CLOUD_RUN_NAME: dbt-ci-{{.ENVIRONMENT}}
+  SERVICE_ACCOUNT_NAME: dbt-github-actions-sa
+  POOL_NAME: dbt-github-actions-pool
+  PROVIDER_NAME: github-provider
+  GITHUB_REPO_OWNER: elifapa
 
 tasks:
-  venv:
-    cmds:
-      - python3 -m venv .venv
+  env:set:
+    desc: "Set environment variables from .env file downstream"
+    cmd: set -a; source .env; set +a
 
-  install:
+  gcloud:auth:
+    desc: "Authenticate with Google Cloud"
     cmds:
-      - source .venv/bin/activate && python3 -m pip install --upgrade pip --progress-bar off > /dev/null
-      - source .venv/bin/activate && python3 -m pip install -r requirements.txt --progress-bar off > /dev/null
-      - source .venv/bin/activate && python3 -m pip install dbt-core dbt-{{.DB}} > /dev/null
+      - echo "Authenticating with Google Cloud..."
+      - gcloud auth application-default login
 
-  gen:
-    cmds:
-      - source .venv/bin/activate && jafgen {{.YEARS}} && rm -rf seeds/jaffle-data && mv jaffle-data seeds
+  gcloud:wif:setup:
+      desc: "Create Workload Identity Pool and Provider"
+      cmds:
+        - echo "Setting up Workload Identity Pool and Provider..."
+        - |
+          gcloud iam workload-identity-pools create {{.POOL_NAME}} \
+            --location="global" \
+            --display-name="AE dbt CI Workload Identity Pool" \
+            --description="Pool for GitHub Actions federation" \
+            --project={{.PROJECT_ID}}
+        - |
+          gcloud iam workload-identity-pools providers create-oidc {{.PROVIDER_NAME}} \
+            --project={{.PROJECT_ID}} \
+            --location="global" \
+            --workload-identity-pool={{.POOL_NAME}} \
+            --display-name="GitHub Provider" \
+            --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
+            --attribute-condition="assertion.repository_owner=='{{.GITHUB_REPO_OWNER}}'" \
+            --issuer-uri="https://token.actions.githubusercontent.com"
 
-  seed:
+  gcloud:wif:create-sa:
+    desc: "Create service account for GitHub Actions"
+    vars:
+      ROLES: |
+        roles/run.admin
+        roles/storage.admin
+        roles/cloudsql.client
+        roles/cloudsql.admin
+        roles/secretmanager.secretAccessor
+        roles/artifactregistry.reader
+        roles/artifactregistry.writer
+        roles/artifactregistry.repoAdmin
+        roles/logging.logWriter
+        roles/serviceusage.serviceUsageAdmin
+        roles/iam.serviceAccountAdmin
     cmds:
-      - >
-        source .venv/bin/activate && dbt seed --full-refresh --vars '{"load_source_data": true}'
+      - echo "👤 Creating service account..."
+      - |
+        if gcloud iam service-accounts describe {{.SERVICE_ACCOUNT_NAME}}@{{.PROJECT_ID}}.iam.gserviceaccount.com \
+          --project={{.PROJECT_ID}} >/dev/null 2>&1; then
+          echo "Service account {{.SERVICE_ACCOUNT_NAME}} already exists, skipping creation"
+        else
+          gcloud iam service-accounts create {{.SERVICE_ACCOUNT_NAME}} \
+            --project={{.PROJECT_ID}} \
+            --display-name="GitHub Actions Service Account"
+          echo "✅ Service account created"
+        fi
+      - echo "🔐 Assigning roles to the service account..."
+      - |
+        # Convert roles to array and iterate
+        echo "{{.ROLES}}" | while read -r role; do
+          if [ -n "$role" ]; then
+            echo "Adding role: $role"
+            gcloud projects add-iam-policy-binding {{.PROJECT_ID}} \
+              --member="serviceAccount:{{.SERVICE_ACCOUNT_NAME}}@{{.PROJECT_ID}}.iam.gserviceaccount.com" \
+              --role="$role"
+          fi
+        done
+      - echo "✅ All permissions granted"
 
-  clean:
+  gcloud:wif:bind-sa:
+    desc: "Bind service account to workload identity pool"
+    # deps:
+    #   - gcloud:wif:create-sa
+    vars:
+      PROJECT_NUMBER:
+        sh: gcloud projects describe {{.PROJECT_ID}} --format="value(projectNumber)"
     cmds:
-      - rm -rf jaffle-data
-      - source .venv/bin/activate && python3 -m pip uninstall dbt-core dbt-{{.DB}} -y
-
-  load:
-    cmds:
-      - task: venv
-      - task: install
-      - task: gen
-      - task: seed
-      - task: clean
+      - echo "🔗 Binding service account to workload identity pool..."
+      - |
+        gcloud iam service-accounts add-iam-policy-binding \
+          {{.SERVICE_ACCOUNT_NAME}}@{{.PROJECT_ID}}.iam.gserviceaccount.com \
+          --project={{.PROJECT_ID}} \
+          --role=roles/iam.workloadIdentityUser \
+          --member="principalSet://iam.googleapis.com/projects/{{.PROJECT_NUMBER}}/locations/global/workloadIdentityPools/{{.POOL_NAME}}/attribute.repository_owner/{{.GITHUB_REPO_OWNER}}"
+      - echo "✅ Service account binding completed"
