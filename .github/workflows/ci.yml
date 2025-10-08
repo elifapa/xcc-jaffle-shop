@@ -13,18 +13,38 @@ jobs:
     strategy:
       fail-fast: true
     env:
+      ENVIRONMENT: "ci"
+      GITHUB_PR_SCHEMA: "ci_pr_${{github.event.pull_request.number}}"
       PG_USERNAME: ${{ secrets.PG_USERNAME }}
       PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
       PG_DB_NAME: ${{ secrets.PG_DB_NAME }}
-      GITHUB_PR_SCHEMA: "ci_pr_${{github.event.pull_request.number}}"
       PG_PUBLIC_IP: ${{secrets.PG_PUBLIC_IP}}
+      GCP_PROJECT_ID: "ae-dbt-ci-2025"
+      GCP_LOCATION: "europe-west4"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Changed Files
-        id: file_changes
+      - name: All changed Files
+        id: all_file_changes
         uses: tj-actions/changed-files@v46.0.3
+
+      - name: Changed Files in dbt and tf
+        id: file_changes_yaml
+        uses: tj-actions/changed-files@v46.0.3
+        with:
+          files_yaml: |
+            dbt:
+              - dbt/**
+            terraform:
+              - terraform/**
+
+      - name: Changed Files in infra
+        id: infra_changes
+        uses: tj-actions/changed-files@v46.0.3
+        with:
+          files: |
+            terraform/**
 
       # - name: Check env var GITHUB_CONTEXT
       #   run: echo '${{ toJson(github) }}'
@@ -32,7 +52,7 @@ jobs:
       - name: Print info
         run: |
           echo PR number: "$GITHUB_PR_SCHEMA"
-          echo Changed files: '${{ steps.file_changes.outputs.all_changed_files}}'
+          echo Changed files: '${{ steps.all_file_changes.outputs.all_changed_files}}'
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -44,10 +64,10 @@ jobs:
         run: uv sync
 
       - name: Run pre-commit on changed files
-        if: steps.file_changes.outputs.any_changed == 'true'
+        if: steps.all_file_changes.outputs.any_changed == 'true'
         uses: pre-commit/action@v3.0.1
         with:
-          extra_args: --files ${{ steps.file_changes.outputs.all_changed_files }}
+          extra_args: --files ${{ steps.all_file_changes.outputs.all_changed_files }}
 
       - name: Authenticate to Google Cloud with Workload Identity Federation
         id: auth_gcloud
@@ -62,3 +82,64 @@ jobs:
 
       - name: 'Use gcloud CLI'
         run: 'gcloud info'
+
+      # Build and push only if dbt files changed
+      # - name: Build and push
+      #   uses: docker/build-push-action@v6
+      #   if: steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+      #   with:
+      #     context: .
+      #     push: true
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Setup Terraform
+        id: setup_terraform
+        if: steps.file_changes_yaml.outputs.terraform_any_changed == 'true' || steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        if: steps.file_changes_yaml.outputs.terraform_any_changed == 'true' || steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+        env:
+          TF_STATE_BUCKET: "xcc-jaffle-shop-tfstate"
+          TF_STATE_BUCKET_PREFIX: "env/${{env.environment}}/terraform/state"
+        run: |
+          echo Using terraform state bucket '${{ env.TF_STATE_BUCKET }}', prefix '${{env.TF_STATE_BUCKET_PREFIX}}'
+          terraform init \
+            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=${{ env.TF_STATE_BUCKET_PREFIX }}"
+
+      - name: Terraform Plan
+        if: steps.file_changes_yaml.outputs.terraform_any_changed == 'true' || steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+        working-directory: ./terraform
+        env:
+          TF_VAR_github_pr_schema: ${{env.GITHUB_PR_SCHEMA}}
+          TF_VAR_gcp_sa_email: "dbt-github-actions-sa@ae-dbt-ci-2025.iam.gserviceaccount.com"
+          TF_VAR_gcp_cloud_run_job: "dbt-ci-job"
+          TF_VAR_db_user: ${{env.PG_USERNAME}}
+          TF_VAR_db_password: ${{env.PG_PASSWORD}}
+          TF_VAR_pg_db_name: ${{env.PG_DB_NAME}}
+          TF_VAR_authorized_networks: '[{"name":"my-office","value":"${{secrets.XEBIA_PUBLIC_IP}}"}]'
+          TF_VAR_gcp_artifact_repository_name: "ae-dbt-ci-images"
+          TF_VAR_image_name: "dbt-ci"
+          TF_VAR_image_tag: "latest"
+        run: |
+          terraform plan -no-color -input=false
+
+      - name: Terraform Apply
+        if: steps.file_changes_yaml.outputs.terraform_any_changed == 'true' || steps.file_changes_yaml.outputs.dbt_any_changed == 'true'
+        working-directory: ./terraform
+        env:
+          TF_VAR_github_pr_schema: ${{env.GITHUB_PR_SCHEMA}}
+          TF_VAR_gcp_sa_email: "dbt-github-actions-sa@ae-dbt-ci-2025.iam.gserviceaccount.com"
+          TF_VAR_gcp_cloud_run_job: "dbt-ci-job"
+          TF_VAR_db_user: ${{env.PG_USERNAME}}
+          TF_VAR_db_password: ${{env.PG_PASSWORD}}
+          TF_VAR_pg_db_name: ${{env.PG_DB_NAME}}
+          TF_VAR_authorized_networks: '[{"name":"my-office","value":"${{secrets.XEBIA_PUBLIC_IP}}"}]'
+          TF_VAR_gcp_artifact_repository_name: "ae-dbt-ci-images"
+          TF_VAR_image_name: "dbt-ci"
+          TF_VAR_image_tag: "latest"
+        run: |
+          terraform apply -auto-approve -input=false
