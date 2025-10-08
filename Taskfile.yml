@@ -105,3 +105,18 @@ tasks:
           --role=roles/iam.workloadIdentityUser \
           --member="principalSet://iam.googleapis.com/projects/{{.PROJECT_NUMBER}}/locations/global/workloadIdentityPools/{{.POOL_NAME}}/attribute.repository_owner/{{.GITHUB_REPO_OWNER}}"
       - echo "✅ Service account binding completed"
+
+  gcloud:wif:get-provider-info:
+    desc: Get workload identity provider information for GitHub Actions
+    vars:
+      PROJECT_NUMBER:
+        sh: gcloud projects describe {{.PROJECT_ID}} --format="value(projectNumber)"
+    cmds:
+      - echo "📋 Getting provider information..."
+      - |
+        echo "🎯 Use these values in your GitHub Actions workflow:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "workload_identity_provider: projects/{{.PROJECT_NUMBER}}/locations/global/workloadIdentityPools/{{.POOL_NAME}}/providers/{{.PROVIDER_NAME}}"
+        echo "service_account: {{.SERVICE_ACCOUNT_NAME}}@{{.PROJECT_ID}}.iam.gserviceaccount.com"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
