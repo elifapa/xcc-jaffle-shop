@@ -62,3 +62,9 @@ resource "google_sql_user" "user" {
   instance = google_sql_database_instance.postgres_instance.name
   password = var.pg_password
 }
+
+resource "google_project_service" "iamcredentials_api" {
+  project = var.gcp_project_id
+  service = "iamcredentials.googleapis.com"
+  disable_on_destroy = false
+}
