@@ -7,15 +7,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends git && apt-get 
 
 WORKDIR /dbt
 
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
 # Install dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-editable
+RUN uv sync --locked --no-install-project --no-editable
 
 COPY dbt .
 
-
 RUN uv run dbt deps
 
-CMD ["uv", "run", "dbt", "--version" ]
+CMD ["uv", "run", "dbt"]
+
+ENTRYPOINT ["uv", "run", "dbt"]
