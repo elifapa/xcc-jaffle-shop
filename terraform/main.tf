@@ -136,7 +136,9 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
       }
     }
   }
+
   deletion_protection = false
+  # APIs to be enabled before creating the Cloud Run Job
   depends_on = [
     google_project_service.iamcredentials_api,
     google_project_service.cloud_sql_admin,
