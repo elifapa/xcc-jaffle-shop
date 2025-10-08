@@ -5,6 +5,10 @@ on:
       - main
 jobs:
   CI_jobs:
+    permissions:
+      contents: read
+      id-token: write # Needed to request OIDC token from GitHub
+
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
