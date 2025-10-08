@@ -11,6 +11,14 @@ variable "gcp_artifact_repository_name" {
   type = string
 }
 
+variable "gcp_cloud_run_job" {
+  type = string
+}
+
+variable "gcp_sa_email" {
+  type = string
+}
+
 variable "pg_db_name" {
   type = string
 }
@@ -34,5 +42,13 @@ variable "authorized_networks" {
 }
 
 variable "image_name" {
+  type = string
+}
+
+variable "image_tag" {
+  type = string
+}
+
+variable "github_pr_schema" {
   type = string
 }
