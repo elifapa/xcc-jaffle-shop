@@ -20,4 +20,4 @@ RUN uv run dbt deps
 
 CMD ["uv", "run", "dbt"]
 
-ENTRYPOINT ["uv", "run", "dbt"]
+ENTRYPOINT ["sh", "-c"]
