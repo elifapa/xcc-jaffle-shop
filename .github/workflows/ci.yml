@@ -87,6 +87,13 @@ jobs:
       - name: 'Use gcloud CLI'
         run: 'gcloud info'
 
+      - name: 'Upload file to GCS'
+        id: 'upload-file'
+        uses: 'google-github-actions/upload-cloud-storage@v2'
+        with:
+          path: 'dbt/target/manifest.json'
+          destination: 'docs'
+
       - name: Docker auth to Google Artifact Registry
         uses: docker/login-action@v3
         with:

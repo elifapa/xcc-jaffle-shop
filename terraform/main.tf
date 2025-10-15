@@ -101,6 +101,14 @@ resource "google_service_account_iam_member" "github_sa_service_account_user" {
   member             = "serviceAccount:${var.gcp_sa_email}"
 }
 
+resource "google_storage_bucket" "static" {
+ name          = "docs"
+ location      = var.gcp_location
+ storage_class = "STANDARD"
+
+ uniform_bucket_level_access = true
+}
+
 resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
   name     = var.gcp_cloud_run_job
   location = var.gcp_location
