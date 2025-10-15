@@ -102,7 +102,7 @@ jobs:
         if: steps.file_changes_dbt.outputs.any_changed == 'true' || steps.file_changes_tf.outputs.any_changed  == 'true'
         env:
           TF_STATE_BUCKET: "xcc-jaffle-shop-tfstate"
-          TF_STATE_BUCKET_PREFIX: "env/${{env.environment}}/terraform/state"
+          TF_STATE_BUCKET_PREFIX: "env/${{env.ENVIRONMENT}}/terraform/state"
         run: |
           echo Using terraform state bucket '${{ env.TF_STATE_BUCKET }}', prefix '${{env.TF_STATE_BUCKET_PREFIX}}'
           terraform init \
