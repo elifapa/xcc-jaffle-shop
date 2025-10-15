@@ -23,6 +23,7 @@ jobs:
       GCP_PROJECT_ID: "ae-dbt-ci-2025"
       GCP_LOCATION: "europe-west4"
       GCP_REPOSITORY: "ae-dbt-ci-images"
+      GCP_CLOUD_RUN_JOB: "dbt-ci-job"
       IMAGE_NAME: "dbt-ci"
 
     steps:
@@ -102,8 +103,10 @@ jobs:
             type=raw,value=${{github.head_ref}}
             type=sha
 
-      - name: Print info
-        run: "echo tags: '${{ steps.meta.outputs.tags }}'"
+      - name: Print image tag info
+        run: |
+          echo tags: '${{ steps.meta.outputs.tags }}'
+          echo version: '${{ steps.meta.outputs.version }}'
 
 
       # Build and push only if dbt files changed
@@ -140,7 +143,7 @@ jobs:
           TF_VAR_gcp_project_id: ${{env.GCP_PROJECT_ID}}
           TF_VAR_gcp_location: ${{env.GCP_LOCATION}}
           TF_VAR_gcp_sa_email: "dbt-github-actions-sa@ae-dbt-ci-2025.iam.gserviceaccount.com"
-          TF_VAR_gcp_cloud_run_job: "dbt-ci-job"
+          TF_VAR_gcp_cloud_run_job: ${{env.GCP_CLOUD_RUN_JOB}}
           TF_VAR_pg_username: ${{env.PG_USERNAME}}
           TF_VAR_pg_password: ${{env.PG_PASSWORD}}
           TF_VAR_pg_db_name: ${{env.PG_DB_NAME}}
@@ -159,7 +162,7 @@ jobs:
           TF_VAR_gcp_project_id: ${{env.GCP_PROJECT_ID}}
           TF_VAR_gcp_location: ${{env.GCP_LOCATION}}
           TF_VAR_gcp_sa_email: "dbt-github-actions-sa@ae-dbt-ci-2025.iam.gserviceaccount.com"
-          TF_VAR_gcp_cloud_run_job: "dbt-ci-job"
+          TF_VAR_gcp_cloud_run_job: ${{env.GCP_CLOUD_RUN_JOB}}
           TF_VAR_pg_username: ${{env.PG_USERNAME}}
           TF_VAR_pg_password: ${{env.PG_PASSWORD}}
           TF_VAR_pg_db_name: ${{env.PG_DB_NAME}}
@@ -169,3 +172,7 @@ jobs:
           TF_VAR_image_tag: ${{ steps.meta.outputs.version }}
         run: |
           terraform apply -auto-approve -input=false
+
+      - name: Trigger Cloud Run Job
+        run: |
+          gcloud run jobs execute ${{env.GCP_CLOUD_RUN_JOB}}

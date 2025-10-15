@@ -102,7 +102,7 @@ resource "google_service_account_iam_member" "github_sa_service_account_user" {
 }
 
 resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
-  name     = "cloudrun-job"
+  name     = var.gcp_cloud_run_job
   location = var.gcp_location
   template {
     template{
