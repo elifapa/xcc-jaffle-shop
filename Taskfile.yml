@@ -120,3 +120,31 @@ tasks:
         echo "service_account: {{.SERVICE_ACCOUNT_NAME}}@{{.PROJECT_ID}}.iam.gserviceaccount.com"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
+
+  docker:build:
+      desc: "Build Docker image"
+      vars:
+        CURRENT_PWD:
+          sh: pwd
+        LOCAL_IMAGE: dbt-ci
+      cmds:
+        - echo "Current directory -> {{.CURRENT_PWD}}"
+        - echo "Building Docker image..."
+        - docker build -t {{.LOCAL_IMAGE}} .
+
+  docker:push:
+    deps:
+      - docker:build
+    vars:
+      LOCAL_IMAGE: dbt-ci
+      TARGET_IMAGE: dbt-ci
+      TAGS:
+        - latest
+        - dockerizing
+    cmds:
+      - echo "Pushing Docker image to Artifact Registry..."
+      - task gcloud:auth
+      - gcloud auth configure-docker {{.LOCATION}}-docker.pkg.dev
+      - for: { var: TAGS, as: TAG }
+        cmd: docker tag {{.LOCAL_IMAGE}} {{.LOCATION}}-docker.pkg.dev/{{.PROJECT_ID}}/{{.REPOSITORY}}/{{.TARGET_IMAGE}}:{{.TAG}}
+      - docker push --all-tags {{.LOCATION}}-docker.pkg.dev/{{.PROJECT_ID}}/{{.REPOSITORY}}/{{.TARGET_IMAGE}}
