@@ -118,6 +118,7 @@ jobs:
 
       # Build and push only if dbt files changed
       - name: Build and push
+        if: steps.file_changes_dbt.outputs.any_changed == 'true' || contains(steps.all_file_changes.outputs.all_changed_files, 'Dockerfile')
         uses: docker/build-push-action@v6
         with:
           context: .
