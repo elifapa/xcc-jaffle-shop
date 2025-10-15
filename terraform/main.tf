@@ -133,7 +133,7 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
       containers {
         name = var.gcp_cloud_run_job
         image = data.google_artifact_registry_docker_image.my_image.self_link
-        args    = ["build", "--target", "cicd"]
+        args    = ["uv run dbt build --target cicd && cp -r target /data/"]
         env {
           name  = "PG_HOSTNAME"
           value = "/cloudsql/${google_sql_database_instance.postgres_instance.connection_name}" #unix socket #google_sql_database_instance.postgres_instance.public_ip_address #tcp connection
@@ -161,7 +161,7 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
         # Mount GCS bucket
         volume_mounts {
           name       = "gcs-bucket"
-          mount_path = "/dbt"
+          mount_path = "/data"
         }
       }
     }
