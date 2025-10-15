@@ -102,7 +102,7 @@ resource "google_service_account_iam_member" "github_sa_service_account_user" {
 }
 
 resource "google_storage_bucket" "static" {
- name          = "docs"
+ name          = "xcc-dbt-state"
  location      = var.gcp_location
  storage_class = "STANDARD"
 
