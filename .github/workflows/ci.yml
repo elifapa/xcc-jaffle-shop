@@ -105,7 +105,6 @@ jobs:
       # Build and push only if dbt files changed
       - name: Build and push
         uses: docker/build-push-action@v6
-        if: steps.file_changes_dbt.outputs.any_changed == 'true'
         with:
           context: .
           push: true
