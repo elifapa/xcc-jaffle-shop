@@ -102,7 +102,7 @@ resource "google_service_account_iam_member" "github_sa_service_account_user" {
 }
 
 resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
-  name     = "cloudrun-job"
+  name     = var.gcp_cloud_run_job
   location = var.gcp_location
   template {
     template{
@@ -116,7 +116,7 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
       containers {
         name = var.gcp_cloud_run_job
         image = data.google_artifact_registry_docker_image.my_image.self_link
-        args    = ["debug --target cicd"]
+        args    = ["build", "--target", "cicd"]
         env {
           name  = "PG_HOSTNAME"
           value = "/cloudsql/${google_sql_database_instance.postgres_instance.connection_name}" #unix socket #google_sql_database_instance.postgres_instance.public_ip_address #tcp connection

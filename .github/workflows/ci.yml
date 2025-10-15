@@ -15,12 +15,17 @@ jobs:
     env:
       ENVIRONMENT: "ci"
       GITHUB_PR_SCHEMA: "ci_pr_${{github.event.pull_request.number}}"
+      GITHUB_BRANCH_NAME: ${{github.head_ref}}
       PG_USERNAME: ${{ secrets.PG_USERNAME }}
       PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
       PG_DB_NAME: ${{ secrets.PG_DB_NAME }}
       PG_PUBLIC_IP: ${{secrets.PG_PUBLIC_IP}}
       GCP_PROJECT_ID: "ae-dbt-ci-2025"
       GCP_LOCATION: "europe-west4"
+      GCP_REPOSITORY: "ae-dbt-ci-images"
+      GCP_CLOUD_RUN_JOB: "dbt-ci-job"
+      IMAGE_NAME: "dbt-ci"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,15 +87,36 @@ jobs:
       - name: 'Use gcloud CLI'
         run: 'gcloud info'
 
+      - name: Docker auth to Google Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{env.GCP_LOCATION}}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth_gcloud.outputs.access_token }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.GCP_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_REPOSITORY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{github.head_ref}}
+            type=sha
+
+      - name: Print image tag info
+        run: |
+          echo tags: '${{ steps.meta.outputs.tags }}'
+          echo version: '${{ steps.meta.outputs.version }}'
+
+
       # Build and push only if dbt files changed
-      # - name: Build and push
-      #   uses: docker/build-push-action@v6
-      #   if: steps.file_changes_dbt.outputs.any_changed == 'true'
-      #   with:
-      #     context: .
-      #     push: true
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Setup Terraform
         id: setup_terraform
@@ -117,14 +143,14 @@ jobs:
           TF_VAR_gcp_project_id: ${{env.GCP_PROJECT_ID}}
           TF_VAR_gcp_location: ${{env.GCP_LOCATION}}
           TF_VAR_gcp_sa_email: "dbt-github-actions-sa@ae-dbt-ci-2025.iam.gserviceaccount.com"
-          TF_VAR_gcp_cloud_run_job: "dbt-ci-job"
+          TF_VAR_gcp_cloud_run_job: ${{env.GCP_CLOUD_RUN_JOB}}
           TF_VAR_pg_username: ${{env.PG_USERNAME}}
           TF_VAR_pg_password: ${{env.PG_PASSWORD}}
           TF_VAR_pg_db_name: ${{env.PG_DB_NAME}}
           TF_VAR_authorized_networks: '[{"name":"my-office","value":"${{secrets.XEBIA_PUBLIC_IP}}"}]'
           TF_VAR_gcp_artifact_repository_name: "ae-dbt-ci-images"
           TF_VAR_image_name: "dbt-ci"
-          TF_VAR_image_tag: "latest"
+          TF_VAR_image_tag: ${{ steps.meta.outputs.version }}
         run: |
           terraform plan -no-color -input=false
 
@@ -136,13 +162,17 @@ jobs:
           TF_VAR_gcp_project_id: ${{env.GCP_PROJECT_ID}}
           TF_VAR_gcp_location: ${{env.GCP_LOCATION}}
           TF_VAR_gcp_sa_email: "dbt-github-actions-sa@ae-dbt-ci-2025.iam.gserviceaccount.com"
-          TF_VAR_gcp_cloud_run_job: "dbt-ci-job"
+          TF_VAR_gcp_cloud_run_job: ${{env.GCP_CLOUD_RUN_JOB}}
           TF_VAR_pg_username: ${{env.PG_USERNAME}}
           TF_VAR_pg_password: ${{env.PG_PASSWORD}}
           TF_VAR_pg_db_name: ${{env.PG_DB_NAME}}
           TF_VAR_authorized_networks: '[{"name":"my-office","value":"${{secrets.XEBIA_PUBLIC_IP}}"}]'
           TF_VAR_gcp_artifact_repository_name: "ae-dbt-ci-images"
           TF_VAR_image_name: "dbt-ci"
-          TF_VAR_image_tag: "latest"
+          TF_VAR_image_tag: ${{ steps.meta.outputs.version }}
         run: |
           terraform apply -auto-approve -input=false
+
+      - name: Trigger Cloud Run Job
+        run: |
+          gcloud run jobs execute ${{env.GCP_CLOUD_RUN_JOB}} --region=${{env.GCP_LOCATION}} --project=${{env.GCP_PROJECT_ID}} --wait
