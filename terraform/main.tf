@@ -80,6 +80,7 @@ resource "google_project_service" "cloud_sql_admin" {
   disable_on_destroy = false
 }
 
+#Enable Cloud Resource Manager API in the project
 resource "google_project_service" "cloudresourcemanager" {
   project = data.google_project.ae_project.project_id
   service = "cloudresourcemanager.googleapis.com"
@@ -150,6 +151,7 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
     google_project_service.iamcredentials_api,
     google_project_service.cloud_sql_admin,
     google_project_service.artifact_registry,
-    google_service_account_iam_member.github_sa_service_account_user
+    google_service_account_iam_member.github_sa_service_account_user,
+    google_project_service.cloudresourcemanager
   ]
 }
