@@ -147,7 +147,7 @@ jobs:
           TF_VAR_authorized_networks: '[{"name":"my-office","value":"${{secrets.XEBIA_PUBLIC_IP}}"}]'
           TF_VAR_gcp_artifact_repository_name: "ae-dbt-ci-images"
           TF_VAR_image_name: "dbt-ci"
-          TF_VAR_image_tag: ${{env.GITHUB_BRANCH_NAME}}
+          TF_VAR_image_tag: ${{ steps.meta.outputs.version }}
         run: |
           terraform plan -no-color -input=false
 
@@ -166,6 +166,6 @@ jobs:
           TF_VAR_authorized_networks: '[{"name":"my-office","value":"${{secrets.XEBIA_PUBLIC_IP}}"}]'
           TF_VAR_gcp_artifact_repository_name: "ae-dbt-ci-images"
           TF_VAR_image_name: "dbt-ci"
-          TF_VAR_image_tag: ${{env.GITHUB_BRANCH_NAME}}
+          TF_VAR_image_tag: ${{ steps.meta.outputs.version }}
         run: |
           terraform apply -auto-approve -input=false
