@@ -80,6 +80,12 @@ resource "google_project_service" "cloud_sql_admin" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "cloudresourcemanager" {
+  project = data.google_project.ae_project.project_id
+  service = "cloudresourcemanager.googleapis.com"
+  disable_on_destroy = false
+}
+
 # Enable Artifact Registry API
 resource "google_project_service" "artifact_registry" {
   project = data.google_project.ae_project.project_id
