@@ -1,0 +1,63 @@
+name: CI_pipeline_PROD
+on:
+  push:
+    branches:
+      - main
+jobs:
+  CI_jobs:
+    permissions:
+      contents: read
+      id-token: write # Needed to request OIDC token from GitHub
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    env:
+      ENVIRONMENT: "ci"
+      GITHUB_BRANCH_NAME: ${{github.head_ref}}
+      PG_USERNAME: ${{ secrets.PG_USERNAME }}
+      PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
+      PG_DB_NAME: ${{ secrets.PG_DB_NAME }}
+      PG_PUBLIC_IP: ${{secrets.PG_PUBLIC_IP}}
+      GCP_PROJECT_ID: "ae-dbt-ci-2025"
+      GCP_LOCATION: "europe-west4"
+      GCP_REPOSITORY: "ae-dbt-ci-images"
+      GCP_CLOUD_RUN_JOB: "dbt-ci-job"
+      IMAGE_NAME: "dbt-ci"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: All changed Files
+        id: all_file_changes
+        uses: tj-actions/changed-files@v46.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install python
+        run: uv python install
+
+      - name: Install project dependencies
+        run: uv sync
+
+      # - name: Run pre-commit on changed files
+      #   if: steps.all_file_changes.outputs.any_changed == 'true'
+      #   uses: pre-commit/action@v3.0.1
+      #   with:
+      #     extra_args: --files ${{ steps.all_file_changes.outputs.all_changed_files }}
+
+      - name: Authenticate to Google Cloud with Workload Identity Federation
+        id: auth_gcloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/321604249783/locations/global/workloadIdentityPools/dbt-github-actions-pool/providers/github-provider'
+          service_account: 'dbt-github-actions-sa@ae-dbt-ci-2025.iam.gserviceaccount.com'
+          token_format: 'access_token'  # Outputs access_token
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: 'Use gcloud CLI'
+        run: 'gcloud info'
