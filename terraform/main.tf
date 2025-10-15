@@ -125,7 +125,7 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
       volumes {
         name = "gcs-bucket"
         gcs {
-          bucket    = "docs"
+          bucket    = google_storage_bucket.static.name
           read_only = false
         }
       }
