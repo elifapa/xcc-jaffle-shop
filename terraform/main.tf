@@ -121,6 +121,15 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
         }
       }
 
+      # GCS bucket mount
+      volumes {
+        name = "gcs-bucket"
+        gcs {
+          bucket    = "docs"
+          read_only = false
+        }
+      }
+
       containers {
         name = var.gcp_cloud_run_job
         image = data.google_artifact_registry_docker_image.my_image.self_link
@@ -148,6 +157,11 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
         volume_mounts {
           name       = "cloudsql"
           mount_path = "/cloudsql"
+        }
+        # Mount GCS bucket
+        volume_mounts {
+          name       = "gcs-bucket"
+          mount_path = "/dbt"
         }
       }
     }
