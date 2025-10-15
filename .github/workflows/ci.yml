@@ -98,8 +98,9 @@ jobs:
         with:
           images: ${{ env.GCP_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_REPOSITORY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=sha
+            type=ref,event=pr
             type=ref,event=branch
+            type=sha
 
 
       # Build and push only if dbt files changed
