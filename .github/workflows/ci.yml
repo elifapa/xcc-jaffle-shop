@@ -100,7 +100,7 @@ jobs:
           tags: |
             type=ref,event=pr
             type=ref,event=branch
-            type=raw,value=${{github.ref_name}}
+            type=raw,value=${{github.head_ref}}
             type=sha
 
       - name: Print info
