@@ -175,4 +175,4 @@ jobs:
 
       - name: Trigger Cloud Run Job
         run: |
-          gcloud run jobs execute ${{env.GCP_CLOUD_RUN_JOB}}
+          gcloud run jobs execute ${{env.GCP_CLOUD_RUN_JOB}} --region=${{env.GCP_LOCATION}} --project=${{env.GCP_PROJECT_ID}} --wait
