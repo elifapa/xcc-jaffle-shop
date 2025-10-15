@@ -15,6 +15,7 @@ jobs:
     env:
       ENVIRONMENT: "ci"
       GITHUB_PR_SCHEMA: "ci_pr_${{github.event.pull_request.number}}"
+      GITHUB_BRANCH_NAME: ${{github.head_ref}}
       PG_USERNAME: ${{ secrets.PG_USERNAME }}
       PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
       PG_DB_NAME: ${{ secrets.PG_DB_NAME }}
@@ -98,8 +99,6 @@ jobs:
         with:
           images: ${{ env.GCP_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_REPOSITORY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=pr
-            type=ref,event=branch
             type=raw,value=${{github.head_ref}}
             type=sha
 
@@ -148,7 +147,7 @@ jobs:
           TF_VAR_authorized_networks: '[{"name":"my-office","value":"${{secrets.XEBIA_PUBLIC_IP}}"}]'
           TF_VAR_gcp_artifact_repository_name: "ae-dbt-ci-images"
           TF_VAR_image_name: "dbt-ci"
-          TF_VAR_image_tag: "latest"
+          TF_VAR_image_tag: ${{env.GITHUB_BRANCH_NAME}}
         run: |
           terraform plan -no-color -input=false
 
@@ -167,6 +166,6 @@ jobs:
           TF_VAR_authorized_networks: '[{"name":"my-office","value":"${{secrets.XEBIA_PUBLIC_IP}}"}]'
           TF_VAR_gcp_artifact_repository_name: "ae-dbt-ci-images"
           TF_VAR_image_name: "dbt-ci"
-          TF_VAR_image_tag: "latest"
+          TF_VAR_image_tag: ${{env.GITHUB_BRANCH_NAME}}
         run: |
           terraform apply -auto-approve -input=false
