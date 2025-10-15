@@ -18,6 +18,4 @@ COPY dbt .
 
 RUN uv run dbt deps
 
-CMD ["uv", "run", "dbt"]
-
-ENTRYPOINT ["sh", "-c"]
+ENTRYPOINT ["uv", "run", "dbt"]
