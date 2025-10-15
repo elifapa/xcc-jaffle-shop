@@ -100,11 +100,11 @@ jobs:
           tags: |
             type=ref,event=pr
             type=ref,event=branch
-            type=raw,value={{branch}}
+            type=raw,value=${{github.ref_name}}
             type=sha
 
       - name: Print info
-        run: ${{ steps.meta.outputs.tags }}
+        run: "echo tags: '${{ steps.meta.outputs.tags }}'"
 
 
       # Build and push only if dbt files changed
