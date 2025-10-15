@@ -21,6 +21,9 @@ jobs:
       PG_PUBLIC_IP: ${{secrets.PG_PUBLIC_IP}}
       GCP_PROJECT_ID: "ae-dbt-ci-2025"
       GCP_LOCATION: "europe-west4"
+      GCP_REPOSITORY: "ae-dbt-ci-images"
+      IMAGE_NAME: "dbt-ci"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,15 +85,32 @@ jobs:
       - name: 'Use gcloud CLI'
         run: 'gcloud info'
 
+      - name: Docker auth to Google Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{env.GCP_LOCATION}}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth_gcloud.outputs.access_token }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.GCP_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_REPOSITORY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha
+            type=ref,event=branch
+
+
       # Build and push only if dbt files changed
-      # - name: Build and push
-      #   uses: docker/build-push-action@v6
-      #   if: steps.file_changes_dbt.outputs.any_changed == 'true'
-      #   with:
-      #     context: .
-      #     push: true
-      #     tags: ${{ steps.meta.outputs.tags }}
-      #     labels: ${{ steps.meta.outputs.labels }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        if: steps.file_changes_dbt.outputs.any_changed == 'true'
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Setup Terraform
         id: setup_terraform
