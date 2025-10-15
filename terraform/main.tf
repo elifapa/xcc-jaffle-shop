@@ -161,7 +161,7 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
         # Mount GCS bucket
         volume_mounts {
           name       = "gcs-bucket"
-          mount_path = "/"
+          mount_path = "/dbt"
         }
       }
     }
