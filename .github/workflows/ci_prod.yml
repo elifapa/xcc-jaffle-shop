@@ -29,6 +29,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check env var GITHUB_CONTEXT
+        run: echo '${{ toJson(github) }}'
+
       - name: All changed Files
         id: all_file_changes
         uses: tj-actions/changed-files@v46.0.3
@@ -42,12 +45,6 @@ jobs:
       - name: Install project dependencies
         run: uv sync
 
-      # - name: Run pre-commit on changed files
-      #   if: steps.all_file_changes.outputs.any_changed == 'true'
-      #   uses: pre-commit/action@v3.0.1
-      #   with:
-      #     extra_args: --files ${{ steps.all_file_changes.outputs.all_changed_files }}
-
       - name: Authenticate to Google Cloud with Workload Identity Federation
         id: auth_gcloud
         uses: google-github-actions/auth@v2
@@ -57,7 +54,38 @@ jobs:
           token_format: 'access_token'  # Outputs access_token
 
       - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v2'
+        uses: 'google-github-actions/setup-gcloud@v3'
 
       - name: 'Use gcloud CLI'
         run: 'gcloud info'
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ env.GCP_LOCATION }}-docker.pkg.dev"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.GCP_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_REPOSITORY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{github.head_ref}}
+            type=raw,value=latest
+            type=sha
+
+      - name: Print image tag info
+        run: |
+          echo tags: '${{ steps.meta.outputs.tags }}'
+          echo version: '${{ steps.meta.outputs.version }}'
+
+      # - name: Build and Push image with cache
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     push: true
+      #     tags: ${{ steps.meta.outputs.tags }}
+      #     labels: ${{ steps.meta.outputs.labels }}
+      #     cache-from: type=registry,ref=${{ env.GCP_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_REPOSITORY }}/${{ env.IMAGE_NAME }}:buildcache
+      #     cache-to: type=registry,ref=${{ env.GCP_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GCP_REPOSITORY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
