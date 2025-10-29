@@ -25,4 +25,3 @@ terraform/.terraform.lock.hcl
 airflow/logs/
 airflow/config/
 airflow/airflow-sa-key.json
-
