@@ -1,8 +1,10 @@
 from airflow import DAG
-from airflow.operators.bash import BashOperator
 from datetime import datetime
 import json
 from pathlib import Path
+from airflow.providers.google.cloud.operators.cloud_run import (
+    CloudRunExecuteJobOperator,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -21,6 +23,10 @@ with DAG(
     schedule=None,
     catchup=False,
 ) as dag:
+    GCP_CLOUDRUN_TASK_ID = "airflow-dbt-ci-job"
+    GCP_PROJECT_ID = "ae-dbt-ci-2025"
+    GCP_REGION = "europe-west4"
+
     # Load manifest
     with open(MANIFEST_PATH, "r") as f:
         manifest = json.load(f)
@@ -34,9 +40,19 @@ with DAG(
     for node_name, node in dbt_nodes.items():
         model_name = node["name"]
 
-        tasks[node_name] = BashOperator(
-            task_id=model_name,
-            bash_command=f"dbt run --select {model_name}",
+        tasks[node_name] = CloudRunExecuteJobOperator(
+            task_id=f"run_{model_name}",
+            project_id=GCP_PROJECT_ID,
+            region=GCP_REGION,
+            job_name=GCP_CLOUDRUN_TASK_ID,
+            overrides={
+                "container_overrides": [
+                    {
+                        "args": ["run", "--select", model_name],
+                    }
+                ],
+            },
+            deferrable=False,
         )
 
     # Now set dependencies
