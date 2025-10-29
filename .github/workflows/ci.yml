@@ -48,9 +48,6 @@ jobs:
           files: |
             dbt/**
 
-      # - name: Check env var GITHUB_CONTEXT
-      #   run: echo '${{ toJson(github) }}'
-
       - name: Print info
         run: |
           echo PR number: "$GITHUB_PR_SCHEMA"
@@ -82,7 +79,7 @@ jobs:
           token_format: 'access_token'  # Outputs access_token
 
       - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v2'
+        uses: 'google-github-actions/setup-gcloud@v3'
 
       - name: 'Use gcloud CLI'
         run: 'gcloud info'
@@ -118,6 +115,7 @@ jobs:
 
       # Build and push only if dbt files changed
       - name: Build and push
+        if: steps.file_changes_dbt.outputs.any_changed == 'true' || contains(steps.all_file_changes.outputs.all_changed_files, 'Dockerfile')
         uses: docker/build-push-action@v6
         with:
           context: .
