@@ -208,7 +208,7 @@ resource "google_cloud_run_v2_job" "airflow_dbt_cloudrunjob" {
       containers {
         name = var.gcp_cloud_run_job
         image = data.google_artifact_registry_docker_image.latest_image.self_link
-        args    = ["uv run dbt build --target cicd && cp -r target /data/${var.image_tag}"]
+        args    = ["uv run dbt build --target airflow && cp -r target /data/${var.image_tag}"]
         env {
           name  = "PG_HOSTNAME"
           value = "/cloudsql/${google_sql_database_instance.postgres_instance.connection_name}" #unix socket #google_sql_database_instance.postgres_instance.public_ip_address #tcp connection
@@ -226,8 +226,8 @@ resource "google_cloud_run_v2_job" "airflow_dbt_cloudrunjob" {
           value = var.pg_db_name
         }
         env {
-          name  = "GITHUB_PR_SCHEMA"
-          value = var.github_pr_schema
+          name  = "PG_SCHEMA_NAME"
+          value = var.pg_prod_schema
         }
         volume_mounts {
           name       = "cloudsql"

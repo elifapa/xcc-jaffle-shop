@@ -32,6 +32,10 @@ variable "pg_password" {
   sensitive = true
 }
 
+variable "pg_prod_schema" {
+  type = string
+}
+
 variable "authorized_networks" {
   description = "List of authorized networks for Cloud SQL"
   type = list(object({

@@ -21,3 +21,13 @@ default:
       schema: "{{env_var('GITHUB_PR_SCHEMA', 'cicd')}}"
       threads: 4
       connect_timeout: 10
+    airflow:
+      type: postgres
+      host: "{{env_var('PG_HOSTNAME', 'localhost')}}"
+      port: 5432
+      user: "{{env_var('PG_USERNAME', 'TEST')}}"
+      password: "{{env_var('PG_PASSWORD', 'TEST')}}"
+      dbname: "{{env_var('PG_DB_NAME', 'jaffle_shop')}}"
+      schema: "{{env_var('PG_SCHEMA_NAME', 'airflow')}}"
+      threads: 4
+      connect_timeout: 10
