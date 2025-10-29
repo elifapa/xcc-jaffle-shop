@@ -48,7 +48,11 @@ with DAG(
             overrides={
                 "container_overrides": [
                     {
-                        "args": ["run", "--select", model_name],
+                        "args": [
+                            "bash",
+                            "-c",
+                            f"uv run dbt build --target airflow --select {model_name} && cp -r target /data/latest",
+                        ],
                     }
                 ],
             },
