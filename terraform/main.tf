@@ -25,6 +25,12 @@ data "google_artifact_registry_docker_image" "my_image" {
   image_name    = "${var.image_name}:${var.image_tag}"
 }
 
+data "google_artifact_registry_docker_image" "latest_image" {
+  location      = var.gcp_location
+  repository_id = var.gcp_artifact_repository_name
+  image_name    = "${var.image_name}:latest"
+}
+
 locals {
   default_compute_sa_email = "${data.google_project.ae_project.number}-compute@developer.gserviceaccount.com"
 }
@@ -133,6 +139,75 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
       containers {
         name = var.gcp_cloud_run_job
         image = data.google_artifact_registry_docker_image.my_image.self_link
+        args    = ["uv run dbt build --target cicd && cp -r target /data/${var.image_tag}"]
+        env {
+          name  = "PG_HOSTNAME"
+          value = "/cloudsql/${google_sql_database_instance.postgres_instance.connection_name}" #unix socket #google_sql_database_instance.postgres_instance.public_ip_address #tcp connection
+        }
+        env {
+          name  = "PG_USERNAME"
+          value = var.pg_username
+        }
+        env {
+          name  = "PG_PASSWORD"
+          value = var.pg_password
+        }
+        env {
+          name  = "PG_DB_NAME"
+          value = var.pg_db_name
+        }
+        env {
+          name  = "GITHUB_PR_SCHEMA"
+          value = var.github_pr_schema
+        }
+        volume_mounts {
+          name       = "cloudsql"
+          mount_path = "/cloudsql"
+        }
+        # Mount GCS bucket
+        volume_mounts {
+          name       = "gcs-bucket"
+          mount_path = "/data"
+        }
+      }
+    }
+  }
+
+  deletion_protection = false
+  # APIs to be enabled before creating the Cloud Run Job
+  depends_on = [
+    google_project_service.iamcredentials_api,
+    google_project_service.cloud_sql_admin,
+    google_project_service.artifact_registry,
+    google_service_account_iam_member.github_sa_service_account_user,
+    google_project_service.cloudresourcemanager
+  ]
+}
+
+resource "google_cloud_run_v2_job" "airflow_dbt_cloudrunjob" {
+  name     = "airflow-${var.gcp_cloud_run_job}"
+  location = var.gcp_location
+  template {
+    template{
+      volumes {
+        name = "cloudsql"
+        cloud_sql_instance {
+          instances = [google_sql_database_instance.postgres_instance.connection_name]
+        }
+      }
+
+      # GCS bucket mount
+      volumes {
+        name = "gcs-bucket"
+        gcs {
+          bucket    = google_storage_bucket.static.name
+          read_only = false
+        }
+      }
+
+      containers {
+        name = var.gcp_cloud_run_job
+        image = data.google_artifact_registry_docker_image.latest_image.self_link
         args    = ["uv run dbt build --target cicd && cp -r target /data/${var.image_tag}"]
         env {
           name  = "PG_HOSTNAME"
