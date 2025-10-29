@@ -101,6 +101,14 @@ resource "google_service_account_iam_member" "github_sa_service_account_user" {
   member             = "serviceAccount:${var.gcp_sa_email}"
 }
 
+resource "google_storage_bucket" "static" {
+ name          = "xcc-dbt-state"
+ location      = var.gcp_location
+ storage_class = "STANDARD"
+
+ uniform_bucket_level_access = true
+}
+
 resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
   name     = var.gcp_cloud_run_job
   location = var.gcp_location
@@ -113,10 +121,19 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
         }
       }
 
+      # GCS bucket mount
+      volumes {
+        name = "gcs-bucket"
+        gcs {
+          bucket    = google_storage_bucket.static.name
+          read_only = false
+        }
+      }
+
       containers {
         name = var.gcp_cloud_run_job
         image = data.google_artifact_registry_docker_image.my_image.self_link
-        args    = ["build", "--target", "cicd"]
+        args    = ["uv run dbt build --target cicd && cp -r target /data/${var.image_tag}"]
         env {
           name  = "PG_HOSTNAME"
           value = "/cloudsql/${google_sql_database_instance.postgres_instance.connection_name}" #unix socket #google_sql_database_instance.postgres_instance.public_ip_address #tcp connection
@@ -140,6 +157,11 @@ resource "google_cloud_run_v2_job" "dbt_cloudrunjob" {
         volume_mounts {
           name       = "cloudsql"
           mount_path = "/cloudsql"
+        }
+        # Mount GCS bucket
+        volume_mounts {
+          name       = "gcs-bucket"
+          mount_path = "/data"
         }
       }
     }
